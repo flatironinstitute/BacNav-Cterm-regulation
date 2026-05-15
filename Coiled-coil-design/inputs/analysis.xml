@@ -1,0 +1,183 @@
+<!--
+A script for the analysis steps.  This will be incorporated into design_fourhelix_bundle.xml;
+for now, I'm just testing these steps separately from the more expensive initial design steps.
+
+Written 22 December 2023 by Vikram K. Mulligan.
+-->
+<!-- <root
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="./rosettascripts.xsd"
+/> -->
+<ROSETTASCRIPTS>
+	<SCOREFXNS>
+		<!-- The current Rosetta default scorefunction: -->
+		<ScoreFunction name="ref" weights="ref2015.wts" />
+
+		<!-- A QM scorefunction that respects C4 symmetry and uses an approximate,
+		semi-empirical method: -->
+		<ScoreFunction name="dftb_c4" weights="empty.wts">
+			<Reweight scoretype="gamess_qm_energy" weight="1.0" />
+			<Set
+				gamess_basis_set="DFTB"
+				gamess_dftb_dispersion_model="DFT"
+				gamess_max_scf_iterations="200"
+				gamess_symmetry="Cn"
+				gamess_symmetry_n="4"
+				gamess_use_smd_solvent="true"
+				gamess_use_scf_damping="true"
+			/>
+		</ScoreFunction>
+	</SCOREFXNS>
+	<RESIDUE_SELECTORS>
+		<!-- Select the first of the four helices: -->
+		<Index name="first_helix_selector" resnums="1-20"  />
+		<Not name="not_first_helix_selector" selector="first_helix_selector" />
+	</RESIDUE_SELECTORS>
+	<PACKER_PALETTES>
+	</PACKER_PALETTES>
+	<TASKOPERATIONS>
+	</TASKOPERATIONS>
+	<MOVE_MAP_FACTORIES>
+	</MOVE_MAP_FACTORIES>
+	<SIMPLE_METRICS>
+		<TotalEnergyMetric name="closedstate_energy_total_energy"
+			scoretype="total_score"
+			scorefxn="ref"
+			custom_type="closedstate_energy_total_energy"
+		/>
+		<TotalEnergyMetric name="openstate_energy_total_energy"
+			scoretype="total_score"
+			scorefxn="ref"
+			custom_type="openstate_energy_total_energy"
+		/>
+		<TotalEnergyMetric name="closedstate_qm_energy_total_energy"
+			scoretype="total_score"
+			scorefxn="dftb_c4"
+			custom_type="closedstate_qm_energy_total_energy"
+		/>
+		<TotalEnergyMetric name="openstate_qm_energy_total_energy"
+			scoretype="total_score"
+			scorefxn="dftb_c4"
+			custom_type="openstate_qm_energy_total_energy"
+		/>
+		<TotalEnergyMetric name="dummymetric"
+			scoretype="total_score"
+			scorefxn="ref"
+		/>
+	</SIMPLE_METRICS>
+	<FILTERS>
+		<BuriedUnsatHbonds name="bunsats" scorefxn="ref" confidence="0.0" />
+		<ShapeComplementarity name="shape" residue_selector1="first_helix_selector"
+			residue_selector2="not_first_helix_selector"  confidence="0.0"
+			write_int_area="true"
+		/>
+		<CavityVolume name="cavvol" confidence="0.0" />
+		<SimpleMetricFilter name="stored_energy_closedstate"
+			fail_on_missing_cache="true"
+			confidence="0.0"
+			use_cached_data="true"
+			metric="dummymetric"
+			cache_prefix="closedstate_energy_"
+		/>
+		<SimpleMetricFilter name="stored_energy_openstate"
+			fail_on_missing_cache="true"
+			confidence="0.0"
+			use_cached_data="true"
+			metric="dummymetric"
+			cache_prefix="openstate_energy_"
+		/>
+		<SimpleMetricFilter name="stored_qm_energy_closedstate"
+			fail_on_missing_cache="true"
+			confidence="0.0"
+			use_cached_data="true"
+			metric="dummymetric"
+			cache_prefix="closedstate_qm_energy_"
+		/>
+		<SimpleMetricFilter name="stored_qm_energy_openstate"
+			fail_on_missing_cache="true"
+			confidence="0.0"
+			use_cached_data="true"
+			metric="dummymetric"
+			cache_prefix="openstate_qm_energy_"
+		/>
+	</FILTERS>
+	<SIMPLE_METRICS>
+		<FilterValueMetric name="bunsats_metric" filter="bunsats" />
+		<FilterValueMetric name="cavvol_metric" filter="cavvol" />
+		<FilterValueMetric name="shape_metric" filter="shape" />
+		<FilterValueMetric name="cached_closedstate_energy"
+			filter="stored_energy_closedstate"
+		/>
+		<FilterValueMetric name="cached_openstate_energy"
+			filter="stored_energy_openstate"
+		/>
+		<CalculatorMetric name="interface_diff" equation="A-B" custom_type="INTERFACE_DIFF" >
+			<Var name="A" metric="cached_closedstate_energy" />
+			<Var name="B" metric="cached_openstate_energy" />
+		</CalculatorMetric>
+
+		<FilterValueMetric name="cached_closedstate_qm_energy"
+			filter="stored_qm_energy_closedstate"
+		/>
+		<FilterValueMetric name="cached_openstate_qm_energy"
+			filter="stored_qm_energy_openstate"
+		/>
+		<CalculatorMetric name="interface_qm_diff" equation="C-D" custom_type="INTERFACE_QM_DIFF" >
+			<Var name="C" metric="cached_closedstate_qm_energy" />
+			<Var name="D" metric="cached_openstate_qm_energy" />
+		</CalculatorMetric>
+	</SIMPLE_METRICS>
+	<ENSEMBLE_METRICS>
+		<ParetoFront name="pareto_front"
+			real_metrics="bunsats_metric,shape_metric,cavvol_metric,interface_diff,interface_qm_diff,cached_closedstate_energy"
+			lower_is_better="true,false,true,true,true,true"
+			output_filename="pareto_analysis.txt"
+			output_mode="tracer_and_file"
+		/>
+	</ENSEMBLE_METRICS>
+	<MOVERS>
+		<!-- Delete all but chain A. -->
+		<DeleteChainsMover name="deletechains" chains="BCD" />
+
+		<!-- Symmetrize. -->
+		<SetupForSymmetry name="setup_symm" definition="inputs/C4_denovo.symm" />
+
+		<!-- QM relax. -->
+		<GamessQMGeometryOptimizationMover name="qm_relax"
+			basis_set="DFTB"
+			dftb_dispersion_model="DFT"
+			dftb_taylor_expansion_order="3"
+			use_smd_solvent="true"
+			max_scf_iterations="200"
+			geo_opt_max_steps="50"
+			geo_opt_tolerance="0.0005"
+			fmo_calculation="true"
+			max_fmo_monomer_scf_iterations="100"
+			gamess_hybrid_molecular_orbital_file="/mnt/home/vmulligan/GAMESS/OLD_gamess_openmp_2022_02/tools/fmo/HMO/HMOs.DFTB.txt"
+			hybrid_molecular_orbital="3ob-3-1"
+		/>
+
+		<!-- Translate the helices out and in. -->
+		<RigidBodyTransMover name="translate_out" distance="1000.0" x="1.0" y="0.0" z="0.0" jump="1" />
+		<RigidBodyTransMover name="translate_in" distance="1000.0" x="-1.0" y="0.0" z="0.0" jump="1" />
+
+	</MOVERS>
+	<PROTOCOLS>
+		<Add mover="deletechains" />
+		<Add mover="setup_symm" />
+		<Add mover="qm_relax" />
+		<Add metrics="closedstate_energy_total_energy" />
+		<Add metrics="closedstate_qm_energy_total_energy" />
+		<Add mover="translate_out" />
+		<Add metrics="openstate_energy_total_energy" />
+		<Add metrics="openstate_qm_energy_total_energy" />
+		<Add mover="translate_in" />
+		<Add metrics="interface_diff" />
+		<Add metrics="interface_qm_diff" />
+		<Add metrics="cavvol_metric" />
+		<Add filter="bunsats" />
+		<Add filter="shape" />
+		<Add ensemble_metrics="pareto_front" />
+	</PROTOCOLS>
+	<OUTPUT scorefxn="ref" />
+</ROSETTASCRIPTS>

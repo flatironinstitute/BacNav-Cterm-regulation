@@ -1,0 +1,475 @@
+<!--
+	design_fourhelix_bundle.xml
+
+	Script by Mahsa Mohfidi and Vikram K. Mulligan, December 2023.
+	This script designs a parallel four-helix bundle with C4 symmetry.
+-->
+<!-- <root
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="./rosettascripts.xsd"
+/> -->
+<ROSETTASCRIPTS>
+		<SCOREFXNS>
+			<!-- The current Rosetta default scorefunction: -->
+			<ScoreFunction name="ref" weights="ref2015.wts" />
+
+			<!-- The Rosetta default scorefunction, with bond angle
+			constraints turned on: -->
+			<ScoreFunction name="ref_bondangle" weights="ref2015.wts" >
+				<Reweight scoretype="cart_bonded" weight="1.0" />
+			</ScoreFunction>
+
+			<!-- The constrained Rosetta default scorefunction: -->
+			<ScoreFunction name="ref_cst" weights="ref2015_cst.wts" />
+
+			<!-- The constrained Rosetta default scorefunction, with bond angle
+			constraints turned on: -->
+			<ScoreFunction name="ref_cst_bondangle" weights="ref2015_cst.wts" >
+				<Reweight scoretype="cart_bonded" weight="1.0" />
+			</ScoreFunction>
+
+			<!-- The constrained Rosetta default scorefunction, with bond angle
+			constraints turned on and guidance scoreterms activated: -->
+			<ScoreFunction name="ref_cst_bondangle_design" weights="ref2015_cst.wts" >
+				<Reweight scoretype="cart_bonded" weight="1.0" />
+				<Reweight scoretype="aa_composition" weight="5.0" />
+				<Reweight scoretype="voids_penalty" weight="0.25" /> 
+				<Reweight scoretype="buried_unsatisfied_penalty" weight="1.0" />
+				<Reweight scoretype="hbnet" weight="1.0" />
+				<Reweight scoretype="netcharge" weight="1.0" />
+			</ScoreFunction>
+
+			<!-- The softened default scorefunction with design-centric guidance score
+			terms activated: -->
+			<ScoreFunction name="ref_soft_design" weights="ref2015_soft.wts" >
+				<Reweight scoretype="aa_composition" weight="5.0" />
+				<Reweight scoretype="voids_penalty" weight="0.25" /> 
+				<Reweight scoretype="buried_unsatisfied_penalty" weight="1.0" />
+				<Reweight scoretype="hbnet" weight="1.0" />
+				<Reweight scoretype="netcharge" weight="1.0" />
+			</ScoreFunction>
+
+			<!-- A QM scorefunction uses the fragment molecular orbital method with an approximate,
+			semi-empirical method, DFTB: -->
+			<ScoreFunction name="dftb_fmo" weights="empty.wts">
+				<Reweight scoretype="gamess_qm_energy" weight="1.0" />
+				<Set
+					gamess_basis_set="DFTB"
+					gamess_dftb_dispersion_model="DFT"
+					gamess_dftb_taylor_expansion_order="3"
+					gamess_use_smd_solvent="true"
+					gamess_max_scf_iterations="200"
+					gamess_fmo_calculation="true"
+					gamess_max_fmo_monomer_scf_iterations="100"
+					gamess_hybrid_molecular_orbital_file="/mnt/home/vmulligan/GAMESS/OLD_gamess_openmp_2022_02/tools/fmo/HMO/HMOs.DFTB.txt"
+					gamess_hybrid_molecular_orbital="3ob-3-1"
+				/>
+			</ScoreFunction>
+
+			<!-- Just the solvation terms in the ref2015 scorefunction. -->
+			<ScoreFunction name="solvation_terms" weights="empty.wts" >
+				<Reweight scoretype="fa_sol" weight="1.0" />
+				<Reweight scoretype="fa_intra_sol_xover4" weight="1.0" />
+				<Reweight scoretype="lk_ball_wtd" weight="1.0" />
+			</ScoreFunction>
+		</SCOREFXNS>
+		<RESIDUE_SELECTORS>
+			<!-- Select buried semi-buried, and exposed positions: -->
+			<Layer name="core_selector" select_core="1" select_boundary="0" select_surface="0" />
+			<Layer name="boundary_selector" select_core="0" select_boundary="1" select_surface="0" />
+			<Layer name="surface_selector" select_core="0" select_boundary="0" select_surface="1" />
+
+			<!-- Cached versions of the core, boundary, and surface positions: -->
+			<StoredResidueSubset name="core_stored" subset_name="CORE_STORED" />
+			<StoredResidueSubset name="boundary_stored" subset_name="BOUNDARY_STORED" />
+			<StoredResidueSubset name="surface_stored" subset_name="SURFACE_STORED" />
+
+			<!-- Select the first of the four helices: -->
+			<Index name="first_helix_selector" resnums="1-20"  />
+			<Not name="not_first_helix_selector" selector="first_helix_selector" />
+
+			<!-- Select buried, semi-buried, and exposed positions in the first of the
+			four helices: -->
+			<And name="first_helix_core_selector" selectors="core_stored,first_helix_selector" />
+			<And name="first_helix_boundary_selector" selectors="boundary_stored,first_helix_selector" />
+			<And name="first_helix_surface_selector" selectors="surface_stored,first_helix_selector "/>
+			<Or name="first_helix_boundary_or_surface_selector" selectors="first_helix_boundary_selector,first_helix_surface_selector" />
+		</RESIDUE_SELECTORS>
+		<TASKOPERATIONS>
+			<!-- Initialize from commandline. -->
+			<InitializeFromCommandline name="init_from_cmd" />
+
+			<!-- Prohibit proline, glycine, and cysteine.  -->
+			<ProhibitSpecifiedBaseResidueTypes name="no_pro_gly_cys"
+				base_types="PRO,GLY,CYS"
+			/>
+
+			<!-- Restrict the surface to polar residues or alanine. -->
+			<RestrictToSpecifiedBaseResidueTypes name="surface_restrictions"
+				selector="first_helix_surface_selector"
+				base_types="ALA,ASP,GLU,HIS,LYS,ASN,GLN,ARG,SER,THR"
+			/>
+
+			<!-- Prohibit large polars in the core. -->
+			<ProhibitSpecifiedBaseResidueTypes name="core_restrictions"
+				selector="first_helix_core_selector"
+				base_types="ARG,LYS,GLU,GLN"
+			/>
+
+			<!-- Prohibit methionine, phenylalanine, and tryptophan outside of the core. -->
+			<ProhibitSpecifiedBaseResidueTypes name="surface_boundary_restrictions"
+				selector="first_helix_boundary_or_surface_selector"
+				base_types="MET,TRP,PHE"
+			/>
+
+			<!-- Enable extra rotamers. -->
+			<ExtraRotamersGeneric name="ex1" ex1="true" ex2="false" extrachi_cutoff="5" />
+			<ExtraRotamersGeneric name="ex1_ex2" ex1="true" ex2="true" extrachi_cutoff="3" />
+
+			<!-- Include current rotamers. -->
+			<IncludeCurrent name="include_current" />
+
+			<!-- Precompute interaction graph. -->
+			<SetIGType name="precompute_ig" precompute_ig="true" />
+
+			<!-- Only design core. -->
+			<OperateOnResidueSubset name="core_only" selector="first_helix_boundary_or_surface_selector" >
+				<PreventRepackingRLT />
+			</OperateOnResidueSubset>
+
+			<!-- Only design core and boundary. -->
+			<OperateOnResidueSubset name="core_boundary_only" selector="first_helix_surface_selector" >
+				<PreventRepackingRLT />
+			</OperateOnResidueSubset>
+
+			<!-- Prohibit design. -->
+			<RestrictToRepacking name="no_design" />
+			
+		</TASKOPERATIONS>
+		<MOVE_MAP_FACTORIES>
+			<MoveMapFactory name="fdes_mmf" bb="true" chi="true" jumps="true" />
+		</MOVE_MAP_FACTORIES>
+		<SIMPLE_METRICS>
+			<SequenceMetric name="seqmetric_oneletter"
+				output_mode="oneletter" residue_selector="first_helix_selector"
+				custom_type="SEQ_ONELETTER"
+			/>
+			<SequenceMetric name="seqmetric_basename"
+				output_mode="basename" residue_selector="first_helix_selector"
+				custom_type="SEQ_BASENAME"
+			/>
+
+			<TotalEnergyMetric name="closedstate_energy_total_energy"
+				scoretype="total_score"
+				scorefxn="ref"
+				custom_type="closedstate_energy_total_energy"
+			/>
+			<TotalEnergyMetric name="openstate_energy_total_energy"
+				scoretype="total_score"
+				scorefxn="ref"
+				custom_type="openstate_energy_total_energy"
+			/>
+			<TotalEnergyMetric name="closedstate_qm_energy_total_energy"
+				scoretype="total_score"
+				scorefxn="dftb_fmo"
+				custom_type="closedstate_qm_energy_total_energy"
+			/>
+			<TotalEnergyMetric name="openstate_qm_energy_total_energy"
+				scoretype="total_score"
+				scorefxn="dftb_fmo"
+				custom_type="openstate_qm_energy_total_energy"
+			/>
+			<TotalEnergyMetric name="closedstate_sol_energy_total_energy"
+				scoretype="total_score"
+				scorefxn="solvation_terms"
+				custom_type="closedstate_sol_energy_total_energy"
+			/>
+			<TotalEnergyMetric name="openstate_sol_energy_total_energy"
+				scoretype="total_score"
+				scorefxn="solvation_terms"
+				custom_type="openstate_sol_energy_total_energy"
+			/>
+			<TotalEnergyMetric name="dummymetric"
+				scoretype="total_score"
+				scorefxn="ref"
+			/>
+		</SIMPLE_METRICS>
+		<FILTERS>
+			<BuriedUnsatHbonds name="bunsats" scorefxn="ref" confidence="0.0" />
+			<ShapeComplementarity name="shape" residue_selector1="first_helix_selector"
+				residue_selector2="not_first_helix_selector"  confidence="0.0"
+				write_int_area="true"
+			/>
+			<CavityVolume name="cavvol" confidence="0.0" />
+			<SimpleMetricFilter name="stored_energy_closedstate"
+				fail_on_missing_cache="true"
+				confidence="0.0"
+				use_cached_data="true"
+				metric="dummymetric"
+				cache_prefix="closedstate_energy_"
+			/>
+			<SimpleMetricFilter name="stored_energy_openstate"
+				fail_on_missing_cache="true"
+				confidence="0.0"
+				use_cached_data="true"
+				metric="dummymetric"
+				cache_prefix="openstate_energy_"
+			/>
+			<SimpleMetricFilter name="stored_qm_energy_closedstate"
+				fail_on_missing_cache="true"
+				confidence="0.0"
+				use_cached_data="true"
+				metric="dummymetric"
+				cache_prefix="closedstate_qm_energy_"
+			/>
+			<SimpleMetricFilter name="stored_qm_energy_openstate"
+				fail_on_missing_cache="true"
+				confidence="0.0"
+				use_cached_data="true"
+				metric="dummymetric"
+				cache_prefix="openstate_qm_energy_"
+			/>
+			<SimpleMetricFilter name="stored_sol_energy_closedstate"
+				fail_on_missing_cache="true"
+				confidence="0.0"
+				use_cached_data="true"
+				metric="dummymetric"
+				cache_prefix="closedstate_sol_energy_"
+			/>
+			<SimpleMetricFilter name="stored_sol_energy_openstate"
+				fail_on_missing_cache="true"
+				confidence="0.0"
+				use_cached_data="true"
+				metric="dummymetric"
+				cache_prefix="openstate_sol_energy_"
+			/>
+		</FILTERS>
+		<SIMPLE_METRICS>
+			<FilterValueMetric name="bunsats_metric" filter="bunsats" />
+			<FilterValueMetric name="cavvol_metric" filter="cavvol" />
+			<FilterValueMetric name="shape_metric" filter="shape" />
+
+			<FilterValueMetric name="cached_closedstate_energy"
+				filter="stored_energy_closedstate"
+			/>
+			<FilterValueMetric name="cached_openstate_energy"
+				filter="stored_energy_openstate"
+			/>
+			<CalculatorMetric name="interface_diff" equation="A-B" custom_type="INTERFACE_DIFF" >
+				<Var name="A" metric="cached_closedstate_energy" />
+				<Var name="B" metric="cached_openstate_energy" />
+			</CalculatorMetric>
+
+			<FilterValueMetric name="cached_closedstate_qm_energy"
+				filter="stored_qm_energy_closedstate"
+			/>
+			<FilterValueMetric name="cached_openstate_qm_energy"
+				filter="stored_qm_energy_openstate"
+			/>
+			<CalculatorMetric name="interface_qm_diff" equation="C-D" custom_type="INTERFACE_QM_DIFF" >
+				<Var name="C" metric="cached_closedstate_qm_energy" />
+				<Var name="D" metric="cached_openstate_qm_energy" />
+			</CalculatorMetric>
+
+			<FilterValueMetric name="cached_closedstate_sol_energy"
+				filter="stored_sol_energy_closedstate"
+			/>
+			<FilterValueMetric name="cached_openstate_sol_energy"
+				filter="stored_sol_energy_openstate"
+			/>
+			<CalculatorMetric name="interface_qm_plus_sol_diff" equation="E+G-F-H" custom_type="INTERFACE_QM_PLUS_SOL_DIFF" >
+				<Var name="E" metric="cached_closedstate_qm_energy" />
+				<Var name="F" metric="cached_openstate_qm_energy" />
+				<Var name="G" metric="cached_closedstate_sol_energy" />
+				<Var name="H" metric="cached_openstate_sol_energy" />
+			</CalculatorMetric>
+
+			<SelectedResiduesMetric name="report_core" residue_selector="core_stored" custom_type="CORE_RESIDUES" />
+			<SelectedResiduesMetric name="report_boundary" residue_selector="boundary_stored" custom_type="BOUNDARY_RESIDUES" />
+			<SelectedResiduesMetric name="report_surface" residue_selector="surface_stored" custom_type="SURFACE_RESIDUES" />
+			<SelectedResiduesPyMOLMetric name="visualize_core" residue_selector="core_stored" custom_type="VISUALIZE_CORE" use_rosetta_numbering="true" />
+			<SelectedResiduesPyMOLMetric name="visualize_boundary" residue_selector="boundary_stored" custom_type="VISUALIZE_BOUNDARY" use_rosetta_numbering="true" />
+			<SelectedResiduesPyMOLMetric name="visualize_surface" residue_selector="surface_stored" custom_type="VISUALIZE_SURFACE" use_rosetta_numbering="true" />
+		</SIMPLE_METRICS>
+		<ENSEMBLE_METRICS>
+			<ParetoFront name="pareto_front"
+				real_metrics="bunsats_metric,shape_metric,cavvol_metric,interface_diff,interface_qm_diff,interface_qm_plus_sol_diff,cached_closedstate_energy"
+				lower_is_better="true,false,true,true,true,true,true"
+				output_filename="pareto_analysis.txt"
+				output_mode="tracer_and_file"
+			/>
+		</ENSEMBLE_METRICS>
+		<CONSTRAINT_GENERATORS>
+			<CoordinateConstraintGenerator
+				name="calpha_cstgen"
+				ca_only="true"
+				bounded="false"
+				residue_selector="first_helix_selector"
+				sd="0.5"
+			/>
+		</CONSTRAINT_GENERATORS>
+		<MOVERS>
+				<!-- Sample helical parameters for a single alpha helix: -->
+				<BundleGridSampler name="bgs1" helix_length="20" use_degrees="true" scorefxn="ref"
+					reset="true" nstruct_mode="true" crick_params_file="alpha_helix_100"
+				>
+					<Helix
+						r0_min="6.75" r0_max="8.75" r0_samples="9"
+						omega0_min="-4" omega0_max="4" omega0_samples="17"
+						delta_omega1_min="-50" delta_omega1_max="50" delta_omega1_samples="11"
+					/>
+				</BundleGridSampler>
+
+				<!-- This is used for its side-effect, adding termini to the chain: -->
+				<DeclareBond name="add_termini" res1="1" res2="2" atom1="C" atom2="N" />
+			
+				<!-- Set up symmetry: -->
+				<SetupForSymmetry name="setup_symm" definition="inputs/C4_denovo.symm" />
+
+				<!-- Cache core, boundary, and surface: -->
+				<StoreResidueSubset name="cache_core_selection" subset_name="CORE_STORED" residue_selector="core_selector" />
+				<StoreResidueSubset name="cache_boundary_selection" subset_name="BOUNDARY_STORED" residue_selector="boundary_selector" />
+				<StoreResidueSubset name="cache_surface_selection" subset_name="SURFACE_STORED" residue_selector="surface_selector" />
+
+				<!-- Add composition constraints: -->
+				<AddCompositionConstraintMover name="addcomp_core" 
+					filename="inputs/design_core.comp"
+					selector="first_helix_core_selector"
+				/>
+				<AddCompositionConstraintMover name="addcomp_boundary" 
+					filename="inputs/design_boundary.comp"
+					selector="first_helix_boundary_selector"
+				/>
+				<AddCompositionConstraintMover name="addcomp_surface" 
+					filename="inputs/design_surface.comp"
+					selector="first_helix_surface_selector"
+				/>
+				<AddHelixSequenceConstraints name="addcomp_helix"
+					add_alanine_constraints="true"
+					add_c_terminal_constraints="true"
+					add_hydrophobic_constraints="false"
+					add_n_terminal_constraints="true"
+					add_overall_constraints="true"
+					overall_max_count="2"
+					residue_selector="first_helix_selector"
+				/>
+
+				<!-- Add net charge constraints for slight negative net change to avoid toxicity. -->
+				<AddNetChargeConstraintMover name="add_charge_constraint"
+					filename="inputs/global.charge" selector="first_helix_selector"
+				/>
+
+				<!-- Sequence design in three stages. -->
+				<PackRotamersMover name="soft_pack_core"
+					scorefxn="ref_soft_design"
+					task_operations="core_only,init_from_cmd,no_pro_gly_cys,surface_boundary_restrictions,surface_restrictions,core_restrictions,ex1_ex2,include_current,precompute_ig"
+				/>
+				<PackRotamersMover name="soft_pack_core_boundary"
+					scorefxn="ref_soft_design"
+					task_operations="core_boundary_only,init_from_cmd,no_pro_gly_cys,surface_boundary_restrictions,surface_restrictions,core_restrictions,ex1,include_current,precompute_ig"
+				/>
+				<PackRotamersMover name="soft_pack_full"
+					scorefxn="ref_soft_design"
+					task_operations="init_from_cmd,no_pro_gly_cys,surface_boundary_restrictions,surface_restrictions,core_restrictions,ex1,include_current,precompute_ig"
+				/>
+
+				<!-- Initial minimization of side-chains. -->
+				<MinMover name="hard_min" scorefxn="ref" bb="false" jump="0" chi="true" />
+
+				<!-- Constrained minimization of side-chains with rigid-body motion. -->
+				<MinMover name="hard_min_rb" scorefxn="ref_cst" bb="false" jump="ALL" chi="true" />
+
+				<!-- Constrained minimization of all degrees of freedom. -->
+				<MinMover name="hard_min_full" scorefxn="ref_cst" bb="true" jump="ALL" chi="true" />
+
+				<!-- Full FastDesign with all DoFs mobile. -->
+				<FastDesign name="fdes" scorefxn="ref_cst_bondangle_design" repeats="3"
+					movemap_factory="fdes_mmf"
+					bondangle="true"
+					task_operations="init_from_cmd,no_pro_gly_cys,surface_boundary_restrictions,surface_restrictions,core_restrictions,ex1,include_current,precompute_ig"
+				/>
+
+				<!-- Constrain alpha carbon positions to prevent drift. -->
+				<AddConstraints name="constrain_calpha" constraint_generators="calpha_cstgen" />
+				<RemoveConstraints name="unconstrain_calpha" constraint_generators="calpha_cstgen" />
+
+				<!-- Final FastRelax. -->
+				<FastRelax name="frlx_cst" scorefxn="ref_cst_bondangle" repeats="2" bondangle="true" movemap_factory="fdes_mmf" task_operations="init_from_cmd,include_current,precompute_ig,ex1_ex2,no_design" />
+				<FastRelax name="frlx_final" scorefxn="ref_bondangle" repeats="3" bondangle="true" movemap_factory="fdes_mmf" task_operations="init_from_cmd,include_current,precompute_ig,ex1_ex2,no_design" />
+
+				<!-- QM relax. -->
+				<GamessQMGeometryOptimizationMover name="qm_relax"
+					basis_set="DFTB"
+					dftb_dispersion_model="DFT"
+					dftb_taylor_expansion_order="3"
+					use_smd_solvent="true"
+					max_scf_iterations="200"
+					geo_opt_max_steps="50"
+					geo_opt_tolerance="0.0005"
+					fmo_calculation="true"
+					max_fmo_monomer_scf_iterations="100"
+					gamess_hybrid_molecular_orbital_file="/mnt/home/vmulligan/GAMESS/OLD_gamess_openmp_2022_02/tools/fmo/HMO/HMOs.DFTB.txt"
+					hybrid_molecular_orbital="3ob-3-1"
+				/>
+
+				<!-- Translate the helices out and in. -->
+				<RigidBodyTransMover name="translate_out"
+					distance="1000.0" x="1.0" y="0.0" z="0.0" jump="1"
+				/>
+				<RigidBodyTransMover name="translate_in"
+					distance="1000.0" x="-1.0" y="0.0" z="0.0" jump="1"
+				/>
+
+		</MOVERS>
+		<PROTOCOLS>
+				<Add mover="bgs1" />
+				<Add mover="add_termini" />
+				<Add mover="setup_symm" />
+
+				<Add mover="cache_core_selection" />
+				<Add mover="cache_boundary_selection" />
+				<Add mover="cache_surface_selection" />
+				<Add metrics="report_core,report_boundary,report_surface" />
+				<Add metrics="visualize_core,visualize_boundary,visualize_surface" />
+
+				<Add mover="addcomp_core" />
+				<Add mover="addcomp_boundary" />
+				<Add mover="addcomp_surface" />
+
+				<Add mover="soft_pack_core" />
+				<Add mover="hard_min" />
+				<Add mover="soft_pack_core_boundary" />
+				<Add mover="constrain_calpha" />
+				<Add mover="hard_min_rb" />
+				<Add mover="addcomp_helix" />
+				<Add mover="add_charge_constraint" />
+				<Add mover="soft_pack_full" />
+				<Add mover="hard_min_full" />
+
+				<Add mover="fdes" />
+
+				<Add mover="frlx_cst" />
+				<Add mover="unconstrain_calpha" />
+				<Add mover="frlx_final" />
+
+				<!-- Final analysis -->
+				<Add mover="qm_relax" />
+				<Add metrics="seqmetric_oneletter,seqmetric_basename" />
+				<Add metrics="closedstate_sol_energy_total_energy" />
+				<Add metrics="closedstate_energy_total_energy" />
+				<Add metrics="closedstate_qm_energy_total_energy" />
+				<Add mover="translate_out" />
+				<Add metrics="openstate_sol_energy_total_energy" />
+				<Add metrics="openstate_energy_total_energy" />
+				<Add metrics="openstate_qm_energy_total_energy" />
+				<Add mover="translate_in" />
+				<Add metrics="interface_diff" />
+				<Add metrics="interface_qm_diff" />
+				<Add metrics="interface_qm_plus_sol_diff" />
+				<Add metrics="cavvol_metric" />
+				<Add filter="bunsats" />
+				<Add filter="shape" />
+				<Add ensemble_metrics="pareto_front" />
+			</PROTOCOLS>
+		<OUTPUT scorefxn="ref" />
+</ROSETTASCRIPTS>

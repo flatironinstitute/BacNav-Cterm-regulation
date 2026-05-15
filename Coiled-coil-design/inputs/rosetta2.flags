@@ -1,0 +1,7 @@
+-in:file:s S_0001.pdb
+-write_all_connect_info
+-parser:protocol inputs/analysis.xml
+-multithreading:total_threads 2
+-outeriterations_scaling 2
+-inneriterations_scaling 2
+-end_outer_iterations_after_first_temperature_rampdown false

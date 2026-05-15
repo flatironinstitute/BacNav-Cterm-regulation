@@ -1,0 +1,9 @@
+-in:file:fasta inputs/dummy.fasta
+-write_all_connect_info
+-nstruct 1683
+-parser:protocol inputs/design_fourhelix_bundle.xml
+-outeriterations_scaling 4
+-inneriterations_scaling 4
+-end_outer_iterations_after_first_temperature_rampdown false
+#-out:file:silent out.silent
+-mute core.pack.annealer.FixbbSimAnnealer core.pack.voids_penalty_energy.VoidsPenaltyVoxelGrid core.optimization.AtomTreeMinimizer protocols.relax.FastRelax
